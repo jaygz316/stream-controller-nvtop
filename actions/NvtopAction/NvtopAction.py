@@ -3,6 +3,7 @@ import time
 import subprocess
 import json
 import threading
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 from loguru import logger as log
 
@@ -30,6 +31,7 @@ class NvtopAction(ActionCore):
     _cached_data = None
     _cached_time = 0
     _cache_lock = threading.Lock()
+    _nvtop_cmd = None
 
     @classmethod
     def get_gpu_data(cls):
@@ -39,16 +41,28 @@ class NvtopAction(ActionCore):
             if cls._cached_data is not None and (now - cls._cached_time) < 0.8:
                 return cls._cached_data
             
+            # Determine the appropriate command to run nvtop
+            if cls._nvtop_cmd is None:
+                if shutil.which("nvtop"):
+                    cls._nvtop_cmd = ["nvtop", "-s"]
+                    log.info("NvtopAction: Found native 'nvtop'")
+                elif shutil.which("flatpak-spawn"):
+                    cls._nvtop_cmd = ["flatpak-spawn", "--host", "nvtop", "-s"]
+                    log.info("NvtopAction: 'nvtop' not found, falling back to 'flatpak-spawn --host nvtop -s'")
+                else:
+                    cls._nvtop_cmd = ["nvtop", "-s"]
+                    log.warning("NvtopAction: Neither 'nvtop' nor 'flatpak-spawn' found in PATH. Using default fallback.")
+
             # Fetch fresh data from nvtop snapshot
             try:
-                result = subprocess.run(["nvtop", "-s"], capture_output=True, text=True, timeout=1.5)
+                result = subprocess.run(cls._nvtop_cmd, capture_output=True, text=True, timeout=1.5)
                 if result.returncode == 0:
                     data = json.loads(result.stdout)
                     cls._cached_data = data
                     cls._cached_time = now
                     return data
             except Exception as e:
-                log.error(f"NvtopAction: Failed to run nvtop -s: {e}")
+                log.error(f"NvtopAction: Failed to run {cls._nvtop_cmd}: {e}")
         return cls._cached_data
 
     def __init__(self, *args, **kwargs):
