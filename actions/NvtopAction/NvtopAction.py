@@ -240,9 +240,11 @@ class NvtopAction(ActionCore):
             if view_mode == "Cycle on Press":
                 active_view = self.current_view_idx
             else:
-                view_modes = ["GPU Util %", "Memory %", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
+                view_modes = ["GPU Util %", "Memory GB", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
                 if view_mode in view_modes:
                     active_view = view_modes.index(view_mode)
+                elif view_mode == "Memory %":
+                    active_view = 1
                 else:
                     active_view = 0
 
@@ -318,7 +320,7 @@ class NvtopAction(ActionCore):
             hist_key = hist_keys[view_idx]
             history_data = self.history[hist_key]
 
-            labels = ["GPU UTIL", "GPU MEM", "GPU TEMP", "GPU PWR", "GPU CLK"]
+            labels = ["GPU UTIL", "MEMORY GB", "GPU TEMP", "GPU PWR", "GPU CLK"]
             
             # Dynamic / static graph scaling limits
             if view_idx in (0, 1):
@@ -384,7 +386,10 @@ class NvtopAction(ActionCore):
                 unit_y = val_y + h_val + int(8 * 1.1)
                 draw.text(((W - w_unit) / 2, unit_y), val_unit, fill=theme["dim"], font=font_unit)
             else:
-                font_val = self.get_font(int(H * 0.24 * 1.1), bold=True)
+                font_size = int(H * 0.24 * 1.1)
+                if view_idx == 1:
+                    font_size = int(H * 0.19 * 1.1)
+                font_val = self.get_font(font_size, bold=True)
                 bbox_val = draw.textbbox((0, 0), val_str, font=font_val)
                 w_val = bbox_val[2] - bbox_val[0]
                 h_val = bbox_val[3] - bbox_val[1]
@@ -501,7 +506,7 @@ class NvtopAction(ActionCore):
             title="View Mode",
             subtitle="Select which statistics to display"
         )
-        view_modes = ["Cycle on Press", "GPU Util %", "Memory %", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
+        view_modes = ["Cycle on Press", "GPU Util %", "Memory GB", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
         for v in view_modes:
             self.view_model_list.append(v)
             
@@ -546,7 +551,7 @@ class NvtopAction(ActionCore):
         selected_str = combo.get_selected_item().get_string()
         settings["view_mode"] = selected_str
         
-        view_modes = ["GPU Util %", "Memory %", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
+        view_modes = ["GPU Util %", "Memory GB", "Temp °C", "Wattage W", "Clock Speed", "Summary"]
         if selected_str in view_modes:
             self.current_view_idx = view_modes.index(selected_str)
             settings["current_view_idx"] = self.current_view_idx
