@@ -9,6 +9,8 @@ from loguru import logger as log
 
 # Import StreamController base classes
 from src.backend.PluginManager.ActionCore import ActionCore
+from src.backend.PluginManager.EventAssigner import EventAssigner
+from src.backend.DeckManagement.InputIdentifier import Input
 
 # Import GTK modules
 import gi
@@ -84,6 +86,20 @@ class NvtopAction(ActionCore):
         self.last_update_time = 0
         self._updating = False
 
+        # Register event assigners for key/dial up events to cycle views
+        self.add_event_assigner(EventAssigner(
+            id="Key Up",
+            ui_label="Key Up",
+            default_events=[Input.Key.Events.UP],
+            callback=self.on_key_up
+        ))
+        self.add_event_assigner(EventAssigner(
+            id="Dial Up",
+            ui_label="Dial Up",
+            default_events=[Input.Dial.Events.UP],
+            callback=self.on_key_up
+        ))
+
     def on_ready(self) -> None:
         settings = self.get_settings()
         if settings is None:
@@ -109,7 +125,7 @@ class NvtopAction(ActionCore):
             self.update_display()
             self.last_update_time = now
 
-    def on_key_up(self) -> None:
+    def on_key_up(self, *args, **kwargs) -> None:
         settings = self.get_settings()
         view_mode = settings.get("view_mode", "Cycle on Press")
         if view_mode == "Cycle on Press":
@@ -332,11 +348,35 @@ class NvtopAction(ActionCore):
             draw.text(((W - w_lbl) / 2, int(H * 0.1)), lbl_txt, fill=theme["dim"], font=font_lbl)
 
             # Draw Large Center Value
-            font_val = self.get_font(int(H * 0.24), bold=True)
-            bbox_val = draw.textbbox((0, 0), val_str, font=font_val)
-            w_val = bbox_val[2] - bbox_val[0]
-            h_val = bbox_val[3] - bbox_val[1]
-            draw.text(((W - w_val) / 2, (H - h_val) / 2 - int(H * 0.05)), val_str, fill=(255, 255, 255, 255), font=font_val)
+            if view_idx == 4:
+                if gpu_clock >= 1000:
+                    val_val = f"{gpu_clock/1000:.2f}"
+                    val_unit = "GHz"
+                else:
+                    val_val = f"{gpu_clock:.0f}"
+                    val_unit = "MHz"
+
+                # Draw Value
+                font_val = self.get_font(int(H * 0.24), bold=True)
+                bbox_val = draw.textbbox((0, 0), val_val, font=font_val)
+                w_val = bbox_val[2] - bbox_val[0]
+                h_val = bbox_val[3] - bbox_val[1]
+                val_y = (H - 24) // 2 - h_val // 2 + 1
+                draw.text(((W - w_val) / 2, val_y), val_val, fill=(255, 255, 255, 255), font=font_val)
+
+                # Draw Unit
+                font_unit = self.get_font(int(H * 0.14), bold=True)
+                bbox_unit = draw.textbbox((0, 0), val_unit, font=font_unit)
+                w_unit = bbox_unit[2] - bbox_unit[0]
+                h_unit = bbox_unit[3] - bbox_unit[1]
+                unit_y = val_y + h_val + 2
+                draw.text(((W - w_unit) / 2, unit_y), val_unit, fill=theme["dim"], font=font_unit)
+            else:
+                font_val = self.get_font(int(H * 0.24), bold=True)
+                bbox_val = draw.textbbox((0, 0), val_str, font=font_val)
+                w_val = bbox_val[2] - bbox_val[0]
+                h_val = bbox_val[3] - bbox_val[1]
+                draw.text(((W - w_val) / 2, (H - h_val) / 2 - int(H * 0.05)), val_str, fill=(255, 255, 255, 255), font=font_val)
 
             # Draw Sparkline
             self.draw_sparkline(draw, W, H, history_data, max_limit, theme)
