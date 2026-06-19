@@ -252,8 +252,13 @@ class NvtopAction(ActionCore):
             except Exception:
                 size = (72, 72)
 
+            # Make the entire view 10% larger
+            W = int(size[0] * 1.1)
+            H = int(size[1] * 1.1)
+            scaled_size = (W, H)
+
             # Render key image
-            img = self.render_key_image(size, active_view, gpu_util, mem_util, temp, power_draw, gpu_clock, used_bytes, total_bytes)
+            img = self.render_key_image(scaled_size, active_view, gpu_util, mem_util, temp, power_draw, gpu_clock, used_bytes, total_bytes)
             self.set_media(image=img)
             
         except Exception as e:
@@ -291,16 +296,22 @@ class NvtopAction(ActionCore):
 
         if view_idx == 5:
             # SUMMARY VIEW: 2x2 instrument panel
-            draw.line([W // 2, 4, W // 2, H - 4], fill=(30, 32, 38, 255), width=1)
-            draw.line([4, H // 2, W - 4, H // 2], fill=(30, 32, 38, 255), width=1)
+            # Move the summary view mode higher so it aligns with the top
+            shift = int(H * 0.08)
+            divider_y = H // 2 - shift
+            cy_top = H // 4 - shift
+            cy_bottom = 3 * H // 4 - shift
 
-            font_lbl = self.get_font(int(H * 0.12), bold=False)
-            font_val = self.get_font(int(H * 0.18), bold=True)
+            draw.line([W // 2, int(4 * 1.1), W // 2, H - int(4 * 1.1)], fill=(30, 32, 38, 255), width=1)
+            draw.line([int(4 * 1.1), divider_y, W - int(4 * 1.1), divider_y], fill=(30, 32, 38, 255), width=1)
 
-            self.draw_quadrant(draw, font_lbl, font_val, "GPU", f"{gpu_util:.0f}%", W // 4, H // 4, theme["dim"])
-            self.draw_quadrant(draw, font_lbl, font_val, "MEM", f"{mem_util:.0f}%", 3 * W // 4, H // 4, theme["dim"])
-            self.draw_quadrant(draw, font_lbl, font_val, "TMP", f"{temp:.0f}°", W // 4, 3 * H // 4, theme["dim"])
-            self.draw_quadrant(draw, font_lbl, font_val, "PWR", f"{power_draw:.0f}W", 3 * W // 4, 3 * H // 4, theme["dim"])
+            font_lbl = self.get_font(int(H * 0.12 * 1.1), bold=False)
+            font_val = self.get_font(int(H * 0.18 * 1.1), bold=True)
+
+            self.draw_quadrant(draw, font_lbl, font_val, "GPU", f"{gpu_util:.0f}%", W // 4, cy_top, theme["dim"])
+            self.draw_quadrant(draw, font_lbl, font_val, "MEM", f"{mem_util:.0f}%", 3 * W // 4, cy_top, theme["dim"])
+            self.draw_quadrant(draw, font_lbl, font_val, "TMP", f"{temp:.0f}°", W // 4, cy_bottom, theme["dim"])
+            self.draw_quadrant(draw, font_lbl, font_val, "PWR", f"{power_draw:.0f}W", 3 * W // 4, cy_bottom, theme["dim"])
         else:
             # SPARKLINE GRAPH VIEW
             hist_keys = ['gpu_util', 'mem_util', 'temp', 'power_draw', 'gpu_clock']
@@ -341,7 +352,7 @@ class NvtopAction(ActionCore):
                     val_str = f"{gpu_clock:.0f} MHz"
 
             # Draw Label
-            font_lbl = self.get_font(int(H * 0.14), bold=True)
+            font_lbl = self.get_font(int(H * 0.14 * 1.1), bold=True)
             lbl_txt = labels[view_idx]
             bbox_lbl = draw.textbbox((0, 0), lbl_txt, font=font_lbl)
             w_lbl = bbox_lbl[2] - bbox_lbl[0]
@@ -357,22 +368,23 @@ class NvtopAction(ActionCore):
                     val_unit = "MHz"
 
                 # Draw Value
-                font_val = self.get_font(int(H * 0.24), bold=True)
+                font_val = self.get_font(int(H * 0.24 * 1.1), bold=True)
                 bbox_val = draw.textbbox((0, 0), val_val, font=font_val)
                 w_val = bbox_val[2] - bbox_val[0]
                 h_val = bbox_val[3] - bbox_val[1]
-                val_y = (H - 24) // 2 - h_val // 2 + 1
+                gy_start = H - int(24 * 1.1)
+                val_y = gy_start // 2 - h_val // 2 + 1
                 draw.text(((W - w_val) / 2, val_y), val_val, fill=(255, 255, 255, 255), font=font_val)
 
                 # Draw Unit
-                font_unit = self.get_font(int(H * 0.14), bold=True)
+                font_unit = self.get_font(int(H * 0.14 * 1.1), bold=True)
                 bbox_unit = draw.textbbox((0, 0), val_unit, font=font_unit)
                 w_unit = bbox_unit[2] - bbox_unit[0]
                 h_unit = bbox_unit[3] - bbox_unit[1]
-                unit_y = val_y + h_val + 8
+                unit_y = val_y + h_val + int(8 * 1.1)
                 draw.text(((W - w_unit) / 2, unit_y), val_unit, fill=theme["dim"], font=font_unit)
             else:
-                font_val = self.get_font(int(H * 0.24), bold=True)
+                font_val = self.get_font(int(H * 0.24 * 1.1), bold=True)
                 bbox_val = draw.textbbox((0, 0), val_str, font=font_val)
                 w_val = bbox_val[2] - bbox_val[0]
                 h_val = bbox_val[3] - bbox_val[1]
@@ -397,10 +409,10 @@ class NvtopAction(ActionCore):
         if not history:
             return
 
-        gx_start = 4
-        gx_end = W - 4
-        gy_start = H - 24
-        gy_end = H - 4
+        gx_start = int(4 * 1.1)
+        gx_end = W - int(4 * 1.1)
+        gy_start = H - int(24 * 1.1)
+        gy_end = H - int(4 * 1.1)
         graph_w = gx_end - gx_start
         graph_h = gy_end - gy_start
 
@@ -424,18 +436,19 @@ class NvtopAction(ActionCore):
             size = self.deck_controller.deck.key_image_format()["size"]
         except Exception:
             size = (72, 72)
-        W, H = size
+        W = int(size[0] * 1.1)
+        H = int(size[1] * 1.1)
         img = Image.new("RGBA", (W, H), (30, 10, 10, 255))
         draw = ImageDraw.Draw(img)
 
         draw.rounded_rectangle([1, 1, W - 2, H - 2], radius=6, outline=(255, 50, 50, 255), width=1)
 
-        font_title = self.get_font(int(H * 0.16), bold=True)
+        font_title = self.get_font(int(H * 0.16 * 1.1), bold=True)
         bbox_title = draw.textbbox((0, 0), "GPU ERROR", font=font_title)
         w_title = bbox_title[2] - bbox_title[0]
         draw.text(((W - w_title) / 2, int(H * 0.2)), "GPU ERROR", fill=(255, 50, 50, 255), font=font_title)
 
-        font_msg = self.get_font(int(H * 0.12), bold=False)
+        font_msg = self.get_font(int(H * 0.12 * 1.1), bold=False)
         bbox_msg = draw.textbbox((0, 0), message, font=font_msg)
         w_msg = bbox_msg[2] - bbox_msg[0]
         draw.text(((W - w_msg) / 2, int(H * 0.55)), message, fill=(255, 255, 255, 255), font=font_msg)
