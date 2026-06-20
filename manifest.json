@@ -2,5 +2,15 @@
     "version": "1.0.7",
     "thumbnail": "assets/gpu_icon.png",
     "id": "com_jay_NvtopPlugin",
-    "name": "GPU Monitor (nvtop)"
+    "name": "GPU Monitor (nvtop)",
+    "description": "GPU monitoring plugin using nvtop for StreamController on Linux.",
+    "descriptions": {
+        "en_US": "GPU monitoring plugin using nvtop for StreamController on Linux."
+    },
+    "short-description": "GPU Monitor using nvtop",
+    "short-descriptions": {
+        "en_US": "GPU Monitor using nvtop"
+    },
+    "author": "jaygz316",
+    "repository": "https://github.com/jaygz316/stream-controller-nvtop"
 }

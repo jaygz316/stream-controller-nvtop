@@ -1,9 +1,9 @@
 {
     "generic": {
-        "copyright": "",
-        "original-url": "",
-        "license": "",
-        "license-url": "",
-        "description": ""
+        "copyright": "Copyright (c) 2026 jaygz316",
+        "original-url": "https://github.com/jaygz316/stream-controller-nvtop",
+        "license": "MIT",
+        "license-url": "https://github.com/jaygz316/stream-controller-nvtop/blob/main/LICENSE",
+        "description": "GPU monitoring plugin using nvtop for StreamController on Linux"
     }
 }
