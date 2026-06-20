@@ -4,6 +4,8 @@ import subprocess
 import json
 import threading
 import shutil
+import re
+from collections import deque
 from PIL import Image, ImageDraw, ImageFont
 from loguru import logger as log
 
@@ -28,12 +30,20 @@ THEMES = {
     "Orange": {"line": (255, 149, 0, 255),   "fill": (255, 149, 0, 40),   "dim": (200, 110, 0, 255)}
 }
 
+# Pre-compiled regular expressions for faster parsing
+RE_NUMERIC_PREFIX = re.compile(r"^([0-9.]+)")
+RE_MEM_VAL = re.compile(r"^([0-9.]+)\s*([a-zA-Z]*)$")
+
 class NvtopAction(ActionCore):
     # Class-level cache to share nvtop data across multiple button instances
     _cached_data = None
     _cached_time = 0
     _cache_lock = threading.Lock()
     _nvtop_cmd = None
+
+    # Class-level font cache to avoid reloading font files from disk on every render
+    _font_cache = {}
+    _font_lock = threading.Lock()
 
     @classmethod
     def get_gpu_data(cls):
@@ -76,11 +86,11 @@ class NvtopAction(ActionCore):
         # Max points to display in sparkline graphs
         self.max_history = 20
         self.history = {
-            'gpu_util': [],
-            'mem_util': [],
-            'temp': [],
-            'power_draw': [],
-            'gpu_clock': []
+            'gpu_util': deque(maxlen=self.max_history),
+            'mem_util': deque(maxlen=self.max_history),
+            'temp': deque(maxlen=self.max_history),
+            'power_draw': deque(maxlen=self.max_history),
+            'gpu_clock': deque(maxlen=self.max_history)
         }
         self.current_view_idx = 0
         self.last_update_time = 0
@@ -145,8 +155,7 @@ class NvtopAction(ActionCore):
         try:
             return float(val_str)
         except ValueError:
-            import re
-            match = re.match(r"^([0-9.]+)", val_str)
+            match = RE_NUMERIC_PREFIX.match(val_str)
             if match:
                 try:
                     return float(match.group(1))
@@ -160,8 +169,7 @@ class NvtopAction(ActionCore):
         val_str = str(val_str).strip()
         if val_str.lower() in ("null", "none", ""):
             return None
-        import re
-        match = re.match(r"^([0-9.]+)\s*([a-zA-Z]*)$", val_str)
+        match = RE_MEM_VAL.match(val_str)
         if not match:
             return None
         num_str, unit = match.groups()
@@ -224,16 +232,12 @@ class NvtopAction(ActionCore):
             if gpu_clock is None:
                 gpu_clock = 0.0
 
-            # Add to rolling history buffers
+            # Add to rolling history buffers (automatically bounded by deque maxlen)
             self.history['gpu_util'].append(gpu_util)
             self.history['mem_util'].append(mem_util)
             self.history['temp'].append(temp)
             self.history['power_draw'].append(power_draw)
             self.history['gpu_clock'].append(gpu_clock)
-
-            for key in self.history:
-                if len(self.history[key]) > self.max_history:
-                    self.history[key].pop(0)
 
             # Determine view state
             view_mode = settings.get("view_mode", "Cycle on Press")
@@ -270,19 +274,28 @@ class NvtopAction(ActionCore):
             self._updating = False
 
     def get_font(self, size, bold=False):
-        font_paths = [
-            "/usr/share/fonts/google-droid-sans-fonts/DroidSans-Bold.ttf" if bold else "/usr/share/fonts/google-droid-sans-fonts/DroidSans.ttf",
-            "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-        ]
-        for path in font_paths:
-            if os.path.exists(path):
-                try:
-                    return ImageFont.try_load(path) if hasattr(ImageFont, "try_load") else ImageFont.truetype(path, size)
-                except Exception:
-                    pass
-        return ImageFont.load_default()
+        cache_key = (size, bold)
+        with self._font_lock:
+            if cache_key in self._font_cache:
+                return self._font_cache[cache_key]
+
+            font_paths = [
+                "/usr/share/fonts/google-droid-sans-fonts/DroidSans-Bold.ttf" if bold else "/usr/share/fonts/google-droid-sans-fonts/DroidSans.ttf",
+                "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf",
+                "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+            ]
+            for path in font_paths:
+                if os.path.exists(path):
+                    try:
+                        font = ImageFont.try_load(path) if hasattr(ImageFont, "try_load") else ImageFont.truetype(path, size)
+                        self._font_cache[cache_key] = font
+                        return font
+                    except Exception:
+                        pass
+            font = ImageFont.load_default()
+            self._font_cache[cache_key] = font
+            return font
 
     def render_key_image(self, size, view_idx, gpu_util, mem_util, temp, power_draw, gpu_clock, used_bytes, total_bytes):
         W, H = size
